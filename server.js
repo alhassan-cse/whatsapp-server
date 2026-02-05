@@ -81,8 +81,6 @@ app.get("/qr", async (req, res) => {
     res.end(imgBuffer);
 });
 
-
-
 // Send message endpoint
 // app.post("/send-message", async (req, res) => {
 //     const { number, message } = req.body;
@@ -97,51 +95,81 @@ app.get("/qr", async (req, res) => {
 //         res.status(500).json({ status: "error", msg: err.message });
 //     }
 // });
-let isConnected = false;
 
-app.post("/send-message", async (req, res) => {
+// let isConnected = false;
 
+app.post("/send-message", (req, res) => {
     console.log("🔥 API HIT");
 
-    // if (!sock || !isConnected) {
-    //     console.log("🔥 API HIT 222");
-    //     return res.status(503).json({
-    //         error: "WhatsApp not connected yet"
-    //     });
-    // }
+    const { number, file_url, caption, name } = req.body;
 
-    try {
-        const { number, file_url, caption, name } = req.body;
+    // ✅ Respond IMMEDIATELY
+    res.status(200).json({
+        ok: true,
+        message: "Request accepted"
+    });
 
-        if (!sock) {
-            return res.status(500).json({ error: "WhatsApp not connected" });
+    // ⬇️ Everything below runs in background
+    (async () => {
+        try {
+            if (!sock) {
+                console.error("❌ WhatsApp not connected");
+                return;
+            }
+
+            // ✅ BEST: let WhatsApp fetch the PDF itself
+            await sock.sendMessage(number + "@s.whatsapp.net", {
+                document: { url: file_url },
+                mimetype: "application/pdf",
+                fileName: "invoice.pdf",
+                caption: caption || `🧾 Your invoice from ${name}`,
+            });
+
+            console.log("✅ WhatsApp message sent");
+
+        } catch (err) {
+            console.error("❌ Background send error:", err.message);
         }
-
-        // 1️⃣ Download PDF from Laravel
-        const response = await axios.get(file_url, {
-            responseType: "arraybuffer",
-        });
-
-        const pdfBuffer = Buffer.from(response.data);
-
-        // 2️⃣ Send PDF as document
-        await sock.sendMessage(number + "@s.whatsapp.net", {
-            document: pdfBuffer,
-            mimetype: "application/pdf",
-            fileName: "invoice.pdf",
-            caption: caption || "🧾 Your invoice From " + name,
-        });
-
-        return res.json({ ok: true });
-
-        // res.json({ status: "sent" });
-    } catch (err) {
-        console.error("Send PDF error:", err);
-        res.status(500).json({ error: err.message });
-    }
+    })();
 });
 
- 
 
+
+
+
+// app.post("/send-message", async (req, res) => {
+
+//     console.log("🔥 API HIT");
+ 
+//     try {
+//         const { number, file_url, caption, name } = req.body;
+
+//         if (!sock) {
+//             return res.status(500).json({ error: "WhatsApp not connected" });
+//         }
+
+//         // 1️⃣ Download PDF from Laravel
+//         const response = await axios.get(file_url, {
+//             responseType: "arraybuffer",
+//         });
+
+//         const pdfBuffer = Buffer.from(response.data);
+
+//         // 2️⃣ Send PDF as document
+//         await sock.sendMessage(number + "@s.whatsapp.net", {
+//             document: pdfBuffer,
+//             mimetype: "application/pdf",
+//             fileName: "invoice.pdf",
+//             caption: caption || "🧾 Your invoice From " + name,
+//         });
+
+//         return res.json({ ok: true });
+
+//         // res.json({ status: "sent" });
+//     } catch (err) {
+//         console.error("Send PDF error:", err);
+//         res.status(500).json({ error: err.message });
+//     }
+// });
 
 app.listen(3000, () => console.log("WA server running on 3000"));
